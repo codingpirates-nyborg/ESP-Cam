@@ -19,7 +19,6 @@
 #define PART_BOUNDARY "123456789000000000000987654321"
 #define CAMERA_MODEL_AI_THINKER
 
-// Konfiguration af kameraets GPIO-pins
 #if defined(CAMERA_MODEL_AI_THINKER)
   #define PWDN_GPIO_NUM     32
   #define RESET_GPIO_NUM    -1
@@ -41,13 +40,14 @@
   #error "Kameramodel er ikke valgt"
 #endif
 
-#define SERVO_1      14
-#define SERVO_2      15
+#define MAX_SERVO_ANGLE 170
+#define MIN_SERVO_ANGLE 10
+#define HOME_POSITION 90
 
 Servo servo1;
 Servo servo2;
-int servo1Pos = 0;
-int servo2Pos = 0;
+int servo1Pos = HOME_POSITION;  // Start i midtposition
+int servo2Pos = HOME_POSITION;  // Start i midtposition
 
 static const char* _STREAM_CONTENT_TYPE = "multipart/x-mixed-replace;boundary=" PART_BOUNDARY;
 static const char* _STREAM_BOUNDARY = "\r\n--" PART_BOUNDARY "\r\n";
@@ -83,8 +83,7 @@ static const char PROGMEM INDEX_HTML[] = R"rawliteral(
       <tr><td align="center"><button class="button" onmousedown="toggleCheckbox('left');" ontouchstart="toggleCheckbox('left');">Venstre</button></td>
       <td align="center"></td><td align="center"><button class="button" onmousedown="toggleCheckbox('right');" ontouchstart="toggleCheckbox('right');">Højre</button></td></tr>
       <tr><td colspan="3" align="center"><button class="button" onmousedown="toggleCheckbox('down');" ontouchstart="toggleCheckbox('down');">Ned</button></td></tr>
-      <tr><td colspan="3" align="center"><button class="button" onmousedown="toggleCheckbox('vflip');" ontouchstart="toggleCheckbox('vflip');">Vend Vertikalt</button></td></tr>
-      <tr><td colspan="3" align="center"><button class="button" onmousedown="toggleCheckbox('hmirror');" ontouchstart="toggleCheckbox('hmirror');">Spejl Horisontalt</button></td></tr>
+      <tr><td colspan="3" align="center"><button class="button" onmousedown="toggleCheckbox('home');" ontouchstart="toggleCheckbox('home');">Home</button></td></tr>
     </table>
    <script>
      function toggleCheckbox(x) {
@@ -101,6 +100,15 @@ static const char PROGMEM INDEX_HTML[] = R"rawliteral(
 static esp_err_t index_handler(httpd_req_t *req){
   httpd_resp_set_type(req, "text/html");
   return httpd_resp_send(req, (const char *)INDEX_HTML, strlen(INDEX_HTML));
+}
+
+// Homing-funktion til at nulstille servomotorerne
+void homeServos() {
+    servo1.write(HOME_POSITION);
+    servo2.write(HOME_POSITION);
+    servo1Pos = HOME_POSITION;
+    servo2Pos = HOME_POSITION;
+    Serial.println("Servoer er returneret til hjem-positionen");
 }
 
 // Handler for streaming af video
@@ -177,32 +185,29 @@ static esp_err_t cmd_handler(httpd_req_t *req){
     }
     if (httpd_req_get_url_query_str(req, buf, buf_len) == ESP_OK) {
       if (httpd_query_key_value(buf, "go", variable, sizeof(variable)) == ESP_OK) {
-        sensor_t * s = esp_camera_sensor_get();
         // Kontroller kommandoerne
         if (strcmp(variable, "up") == 0) {
-          if(servo1Pos <= 170) {
+          if(servo1Pos < MAX_SERVO_ANGLE) {
             servo1Pos += 10;
             servo1.write(servo1Pos);
           }
+        } else if (strcmp(variable, "down") == 0) {
+          if(servo1Pos > MIN_SERVO_ANGLE) {
+            servo1Pos -= 10;
+            servo1.write(servo1Pos);
+          }
         } else if (strcmp(variable, "left") == 0) {
-          if(servo2Pos <= 170) {
+          if(servo2Pos < MAX_SERVO_ANGLE) {
             servo2Pos += 10;
             servo2.write(servo2Pos);
           }
         } else if (strcmp(variable, "right") == 0) {
-          if(servo2Pos >= 10) {
+          if(servo2Pos > MIN_SERVO_ANGLE) {
             servo2Pos -= 10;
             servo2.write(servo2Pos);
           }
-        } else if (strcmp(variable, "down") == 0) {
-          if(servo1Pos >= 10) {
-            servo1Pos -= 10;
-            servo1.write(servo1Pos);
-          }
-        } else if (strcmp(variable, "vflip") == 0) {
-          s->set_vflip(s, 1);  // Aktiver vflip
-        } else if (strcmp(variable, "hmirror") == 0) {
-          s->set_hmirror(s, 1);  // Aktiver hmirror
+        } else if (strcmp(variable, "home") == 0) {
+          homeServos();  // Kalder homing-funktionen for at nulstille servopositionerne
         }
 
         free(buf);
