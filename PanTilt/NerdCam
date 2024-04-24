@@ -1,9 +1,8 @@
 /*********
   Rui Santos
-  Complete instructions at https://RandomNerdTutorials.com/esp32-cam-projects-ebook/
+  Komplette instruktioner på https://RandomNerdTutorials.com/esp32-cam-projects-ebook/
   
-  Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files.
-  The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+  Tilladelse gives hermed gratis til enhver person, der får en kopi af denne software og tilhørende dokumentationsfiler.
 *********/
 
 #include "esp_camera.h"
@@ -12,84 +11,21 @@
 #include "img_converters.h"
 #include "Arduino.h"
 #include "fb_gfx.h"
-#include "soc/soc.h"             // disable brownout problems
-#include "soc/rtc_cntl_reg.h"    // disable brownout problems
+#include "soc/soc.h"             // Deaktiverer problemer med spændingsfald
+#include "soc/rtc_cntl_reg.h"    // Deaktiverer problemer med spændingsfald
 #include "esp_http_server.h"
 #include <ESP32Servo.h>
 
-
 #define PART_BOUNDARY "123456789000000000000987654321"
-
 #define CAMERA_MODEL_AI_THINKER
-//#define CAMERA_MODEL_M5STACK_PSRAM
-//#define CAMERA_MODEL_M5STACK_WITHOUT_PSRAM
-//#define CAMERA_MODEL_M5STACK_PSRAM_B
-//#define CAMERA_MODEL_WROVER_KIT
 
-#if defined(CAMERA_MODEL_WROVER_KIT)
-  #define PWDN_GPIO_NUM    -1
-  #define RESET_GPIO_NUM   -1
-  #define XCLK_GPIO_NUM    21
-  #define SIOD_GPIO_NUM    26
-  #define SIOC_GPIO_NUM    27
-  
-  #define Y9_GPIO_NUM      35
-  #define Y8_GPIO_NUM      34
-  #define Y7_GPIO_NUM      39
-  #define Y6_GPIO_NUM      36
-  #define Y5_GPIO_NUM      19
-  #define Y4_GPIO_NUM      18
-  #define Y3_GPIO_NUM       5
-  #define Y2_GPIO_NUM       4
-  #define VSYNC_GPIO_NUM   25
-  #define HREF_GPIO_NUM    23
-  #define PCLK_GPIO_NUM    22
-
-#elif defined(CAMERA_MODEL_M5STACK_PSRAM)
-  #define PWDN_GPIO_NUM     -1
-  #define RESET_GPIO_NUM    15
-  #define XCLK_GPIO_NUM     27
-  #define SIOD_GPIO_NUM     25
-  #define SIOC_GPIO_NUM     23
-  
-  #define Y9_GPIO_NUM       19
-  #define Y8_GPIO_NUM       36
-  #define Y7_GPIO_NUM       18
-  #define Y6_GPIO_NUM       39
-  #define Y5_GPIO_NUM        5
-  #define Y4_GPIO_NUM       34
-  #define Y3_GPIO_NUM       35
-  #define Y2_GPIO_NUM       32
-  #define VSYNC_GPIO_NUM    22
-  #define HREF_GPIO_NUM     26
-  #define PCLK_GPIO_NUM     21
-
-#elif defined(CAMERA_MODEL_M5STACK_WITHOUT_PSRAM)
-  #define PWDN_GPIO_NUM     -1
-  #define RESET_GPIO_NUM    15
-  #define XCLK_GPIO_NUM     27
-  #define SIOD_GPIO_NUM     25
-  #define SIOC_GPIO_NUM     23
-  
-  #define Y9_GPIO_NUM       19
-  #define Y8_GPIO_NUM       36
-  #define Y7_GPIO_NUM       18
-  #define Y6_GPIO_NUM       39
-  #define Y5_GPIO_NUM        5
-  #define Y4_GPIO_NUM       34
-  #define Y3_GPIO_NUM       35
-  #define Y2_GPIO_NUM       17
-  #define VSYNC_GPIO_NUM    22
-  #define HREF_GPIO_NUM     26
-  #define PCLK_GPIO_NUM     21
-
-#elif defined(CAMERA_MODEL_AI_THINKER)
+// Konfiguration af kameraets GPIO-pins
+#if defined(CAMERA_MODEL_AI_THINKER)
   #define PWDN_GPIO_NUM     32
   #define RESET_GPIO_NUM    -1
   #define XCLK_GPIO_NUM      0
   #define SIOD_GPIO_NUM     26
   #define SIOC_GPIO_NUM     27
-  
   #define Y9_GPIO_NUM       35
   #define Y8_GPIO_NUM       34
   #define Y7_GPIO_NUM       39
@@ -101,40 +37,15 @@
   #define VSYNC_GPIO_NUM    25
   #define HREF_GPIO_NUM     23
   #define PCLK_GPIO_NUM     22
-
-#elif defined(CAMERA_MODEL_M5STACK_PSRAM_B)
-  #define PWDN_GPIO_NUM     -1
-  #define RESET_GPIO_NUM    15
-  #define XCLK_GPIO_NUM     27
-  #define SIOD_GPIO_NUM     22
-  #define SIOC_GPIO_NUM     23
-  
-  #define Y9_GPIO_NUM       19
-  #define Y8_GPIO_NUM       36
-  #define Y7_GPIO_NUM       18
-  #define Y6_GPIO_NUM       39
-  #define Y5_GPIO_NUM        5
-  #define Y4_GPIO_NUM       34
-  #define Y3_GPIO_NUM       35
-  #define Y2_GPIO_NUM       32
-  #define VSYNC_GPIO_NUM    25
-  #define HREF_GPIO_NUM     26
-  #define PCLK_GPIO_NUM     21
-
 #else
-  #error "Camera model not selected"
+  #error "Kameramodel er ikke valgt"
 #endif
 
 #define SERVO_1      14
 #define SERVO_2      15
 
-#define SERVO_STEP   5
-
-Servo servoN1;
-Servo servoN2;
 Servo servo1;
 Servo servo2;
-
 int servo1Pos = 0;
 int servo2Pos = 0;
 
@@ -145,6 +56,7 @@ static const char* _STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %
 httpd_handle_t camera_httpd = NULL;
 httpd_handle_t stream_httpd = NULL;
 
+// HTML-side som sendes til klientens browser
 static const char PROGMEM INDEX_HTML[] = R"rawliteral(
 <html>
   <head>
@@ -153,48 +65,35 @@ static const char PROGMEM INDEX_HTML[] = R"rawliteral(
     <style>
       body { font-family: Arial; text-align: center; margin:0px auto; padding-top: 30px;}
       table { margin-left: auto; margin-right: auto; }
-      td { padding: 8 px; }
+      td { padding: 8px; }
       .button {
-        background-color: #2f4468;
-        border: none;
-        color: white;
-        padding: 10px 20px;
-        text-align: center;
-        text-decoration: none;
-        display: inline-block;
-        font-size: 18px;
-        margin: 6px 3px;
-        cursor: pointer;
-        -webkit-touch-callout: none;
-        -webkit-user-select: none;
-        -khtml-user-select: none;
-        -moz-user-select: none;
-        -ms-user-select: none;
-        user-select: none;
-        -webkit-tap-highlight-color: rgba(0,0,0,0);
+        background-color: #2f4468; border: none; color: white; padding: 10px 20px; text-align: center;
+        text-decoration: none; display: inline-block; font-size: 18px; margin: 6px 3px; cursor: pointer;
+        -webkit-touch-callout: none; -webkit-user-select: none; -khtml-user-select: none;
+        -moz-user-select: none; -ms-user-select: none; user-select: none; -webkit-tap-highlight-color: rgba(0,0,0,0);
       }
-      img {  width: auto ;
-        max-width: 100% ;
-        height: auto ; 
-      }
+      img { width: auto; max-width: 100%; height: auto; }
     </style>
   </head>
   <body>
     <h1>ESP32-CAM Pan and Tilt</h1>
     <img src="" id="photo" >
     <table>
-      <tr><td colspan="3" align="center"><button class="button" onmousedown="toggleCheckbox('up');" ontouchstart="toggleCheckbox('up');">Up</button></td></tr>
-      <tr><td align="center"><button class="button" onmousedown="toggleCheckbox('left');" ontouchstart="toggleCheckbox('left');">Left</button></td><td align="center"></td><td align="center"><button class="button" onmousedown="toggleCheckbox('right');" ontouchstart="toggleCheckbox('right');">Right</button></td></tr>
-      <tr><td colspan="3" align="center"><button class="button" onmousedown="toggleCheckbox('down');" ontouchstart="toggleCheckbox('down');">Down</button></td></tr>                   
+      <tr><td colspan="3" align="center"><button class="button" onmousedown="toggleCheckbox('up');" ontouchstart="toggleCheckbox('up');">Op</button></td></tr>
+      <tr><td align="center"><button class="button" onmousedown="toggleCheckbox('left');" ontouchstart="toggleCheckbox('left');">Venstre</button></td>
+      <td align="center"></td><td align="center"><button class="button" onmousedown="toggleCheckbox('right');" ontouchstart="toggleCheckbox('right');">Højre</button></td></tr>
+      <tr><td colspan="3" align="center"><button class="button" onmousedown="toggleCheckbox('down');" ontouchstart="toggleCheckbox('down');">Ned</button></td></tr>
+      <tr><td colspan="3" align="center"><button class="button" onmousedown="toggleCheckbox('vflip');" ontouchstart="toggleCheckbox('vflip');">Vend Vertikalt</button></td></tr>
+      <tr><td colspan="3" align="center"><button class="button" onmousedown="toggleCheckbox('hmirror');" ontouchstart="toggleCheckbox('hmirror');">Spejl Horisontalt</button></td></tr>
     </table>
    <script>
-   function toggleCheckbox(x) {
-     var xhr = new XMLHttpRequest();
-     xhr.open("GET", "/action?go=" + x, true);
-     xhr.send();
-   }
-   window.onload = document.getElementById("photo").src = window.location.href.slice(0, -1) + ":81/stream";
-  </script>
+     function toggleCheckbox(x) {
+       var xhr = new XMLHttpRequest();
+       xhr.open("GET", "/action?go=" + x, true);
+       xhr.send();
+     }
+     window.onload = document.getElementById("photo").src = window.location.href.slice(0, -1) + ":81/stream";
+   </script>
   </body>
 </html>
 )rawliteral";
@@ -204,6 +103,7 @@ static esp_err_t index_handler(httpd_req_t *req){
   return httpd_resp_send(req, (const char *)INDEX_HTML, strlen(INDEX_HTML));
 }
 
+// Handler for streaming af video
 static esp_err_t stream_handler(httpd_req_t *req){
   camera_fb_t * fb = NULL;
   esp_err_t res = ESP_OK;
@@ -219,7 +119,7 @@ static esp_err_t stream_handler(httpd_req_t *req){
   while(true){
     fb = esp_camera_fb_get();
     if (!fb) {
-      Serial.println("Camera capture failed");
+      Serial.println("Kameraets fangst mislykkedes");
       res = ESP_FAIL;
     } else {
       if(fb->width > 400){
@@ -228,7 +128,7 @@ static esp_err_t stream_handler(httpd_req_t *req){
           esp_camera_fb_return(fb);
           fb = NULL;
           if(!jpeg_converted){
-            Serial.println("JPEG compression failed");
+            Serial.println("JPEG-kompression mislykkedes");
             res = ESP_FAIL;
           }
         } else {
@@ -258,13 +158,13 @@ static esp_err_t stream_handler(httpd_req_t *req){
     if(res != ESP_OK){
       break;
     }
-    //Serial.printf("MJPG: %uB\n",(uint32_t)(_jpg_buf_len));
   }
   return res;
 }
 
+// Handler for kommandoer sendt fra webgrænsefladen
 static esp_err_t cmd_handler(httpd_req_t *req){
-  char*  buf;
+  char* buf;
   size_t buf_len;
   char variable[32] = {0,};
   
@@ -277,6 +177,37 @@ static esp_err_t cmd_handler(httpd_req_t *req){
     }
     if (httpd_req_get_url_query_str(req, buf, buf_len) == ESP_OK) {
       if (httpd_query_key_value(buf, "go", variable, sizeof(variable)) == ESP_OK) {
+        sensor_t * s = esp_camera_sensor_get();
+        // Kontroller kommandoerne
+        if (strcmp(variable, "up") == 0) {
+          if(servo1Pos <= 170) {
+            servo1Pos += 10;
+            servo1.write(servo1Pos);
+          }
+        } else if (strcmp(variable, "left") == 0) {
+          if(servo2Pos <= 170) {
+            servo2Pos += 10;
+            servo2.write(servo2Pos);
+          }
+        } else if (strcmp(variable, "right") == 0) {
+          if(servo2Pos >= 10) {
+            servo2Pos -= 10;
+            servo2.write(servo2Pos);
+          }
+        } else if (strcmp(variable, "down") == 0) {
+          if(servo1Pos >= 10) {
+            servo1Pos -= 10;
+            servo1.write(servo1Pos);
+          }
+        } else if (strcmp(variable, "vflip") == 0) {
+          s->set_vflip(s, 1);  // Aktiver vflip
+        } else if (strcmp(variable, "hmirror") == 0) {
+          s->set_hmirror(s, 1);  // Aktiver hmirror
+        }
+
+        free(buf);
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+        return httpd_resp_send(req, NULL, 0);
       } else {
         free(buf);
         httpd_resp_send_404(req);
@@ -287,64 +218,13 @@ static esp_err_t cmd_handler(httpd_req_t *req){
       httpd_resp_send_404(req);
       return ESP_FAIL;
     }
-    free(buf);
   } else {
     httpd_resp_send_404(req);
     return ESP_FAIL;
   }
-
-  sensor_t * s = esp_camera_sensor_get();
-  //flip the camera vertically
-  //s->set_vflip(s, 1);          // 0 = disable , 1 = enable
-  // mirror effect
-  //s->set_hmirror(s, 1);          // 0 = disable , 1 = enable
-
-  int res = 0;
-  
-  if(!strcmp(variable, "up")) {
-    if(servo1Pos <= 170) {
-      servo1Pos += 10;
-      servo1.write(servo1Pos);
-    }
-    Serial.println(servo1Pos);
-    Serial.println("Up");
-  }
-  else if(!strcmp(variable, "left")) {
-    if(servo2Pos <= 170) {
-      servo2Pos += 10;
-      servo2.write(servo2Pos);
-    }
-    Serial.println(servo2Pos);
-    Serial.println("Left");
-  }
-  else if(!strcmp(variable, "right")) {
-    if(servo2Pos >= 10) {
-      servo2Pos -= 10;
-      servo2.write(servo2Pos);
-    }
-    Serial.println(servo2Pos);
-    Serial.println("Right");
-  }
-  else if(!strcmp(variable, "down")) {
-    if(servo1Pos >= 10) {
-      servo1Pos -= 10;
-      servo1.write(servo1Pos);
-    }
-    Serial.println(servo1Pos);
-    Serial.println("Down");
-  }
-  else {
-    res = -1;
-  }
-
-  if(res){
-    return httpd_resp_send_500(req);
-  }
-
-  httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-  return httpd_resp_send(req, NULL, 0);
 }
 
+// Starter HTTP-serveren for kameraet
 void startCameraServer(){
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
   config.server_port = 80;
@@ -354,7 +234,6 @@ void startCameraServer(){
     .handler   = index_handler,
     .user_ctx  = NULL
   };
-
   httpd_uri_t cmd_uri = {
     .uri       = "/action",
     .method    = HTTP_GET,
@@ -370,6 +249,7 @@ void startCameraServer(){
   if (httpd_start(&camera_httpd, &config) == ESP_OK) {
     httpd_register_uri_handler(camera_httpd, &index_uri);
     httpd_register_uri_handler(camera_httpd, &cmd_uri);
+    httpd_register_uri_handler(camera_httpd, &stream_uri);
   }
   config.server_port += 1;
   config.ctrl_port += 1;
@@ -378,13 +258,11 @@ void startCameraServer(){
   }
 }
 
+// Opsætning af kamera og server
 void setup() {
-  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable brownout detector
-  servo1.setPeriodHertz(50);    // standard 50 hz servo
-  servo2.setPeriodHertz(50);    // standard 50 hz servo
-  servoN1.attach(2, 1000, 2000);
-  servoN2.attach(13, 1000, 2000);
-  
+  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); // Deaktiverer spændingsfald-detektor
+  servo1.setPeriodHertz(50);    // Standard 50 Hz servo
+  servo2.setPeriodHertz(50);    // Standard 50 Hz servo
   servo1.attach(SERVO_1, 1000, 2000);
   servo2.attach(SERVO_2, 1000, 2000);
   
@@ -414,8 +292,8 @@ void setup() {
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
-  config.pixel_format = PIXFORMAT_JPEG; 
-  
+  config.pixel_format = PIXFORMAT_JPEG;
+
   if(psramFound()){
     config.frame_size = FRAMESIZE_VGA;
     config.jpeg_quality = 10;
@@ -426,25 +304,22 @@ void setup() {
     config.fb_count = 1;
   }
   
-  // Camera init
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
-    Serial.printf("Camera init failed with error 0x%x", err);
+    Serial.printf("Kameraets initiering fejlede med fejlen 0x%x", err);
     return;
   }
-  // Start af Access Point
   const char* ssid = "ESP32-CAM-AP";
   const char* password = "123456789"; // Minimum 8 tegn, eller brug NULL for et åbent netværk
   
   WiFi.softAP(ssid, password);
-  Serial.println("Access Point Started");
-  Serial.print("IP Address: ");
+  Serial.println("Adgangspunkt startet");
+  Serial.print("IP-adresse: ");
   Serial.println(WiFi.softAPIP());
   
-  // Start streaming web server
   startCameraServer();
 }
 
 void loop() {
-  
+  // Denne del forbliver tom, da ESP32 håndterer HTTP-serveren i baggrunden.
 }
