@@ -48,6 +48,8 @@ Servo servo1;
 Servo servo2;
 int servo1Pos = 0;
 int servo2Pos = 0;
+int vflip = 1;
+int hflip = 1;
 
 static const char* _STREAM_CONTENT_TYPE = "multipart/x-mixed-replace;boundary=" PART_BOUNDARY;
 static const char* _STREAM_BOUNDARY = "\r\n--" PART_BOUNDARY "\r\n";
@@ -79,12 +81,12 @@ static const char PROGMEM INDEX_HTML[] = R"rawliteral(
     <h1>ESP32-CAM Pan and Tilt</h1>
     <img src="" id="photo" >
     <table>
-      <tr><td colspan="3" align="center"><button class="button" onmousedown="toggleCheckbox('up');" ontouchstart="toggleCheckbox('up');">Op</button></td></tr>
-      <tr><td align="center"><button class="button" onmousedown="toggleCheckbox('left');" ontouchstart="toggleCheckbox('left');">Venstre</button></td>
-      <td align="center"></td><td align="center"><button class="button" onmousedown="toggleCheckbox('right');" ontouchstart="toggleCheckbox('right');">Højre</button></td></tr>
-      <tr><td colspan="3" align="center"><button class="button" onmousedown="toggleCheckbox('down');" ontouchstart="toggleCheckbox('down');">Ned</button></td></tr>
-      <tr><td colspan="3" align="center"><button class="button" onmousedown="toggleCheckbox('vflip');" ontouchstart="toggleCheckbox('vflip');">Vend Vertikalt</button></td></tr>
-      <tr><td colspan="3" align="center"><button class="button" onmousedown="toggleCheckbox('hmirror');" ontouchstart="toggleCheckbox('hmirror');">Spejl Horisontalt</button></td></tr>
+      <tr><td colspan="3" align="center"><button class="button" onmousedown="toggleCheckbox('up');" ontouchstart="toggleCheckbox('up');">Up</button></td></tr>
+      <tr><td align="center"><button class="button" onmousedown="toggleCheckbox('left');" ontouchstart="toggleCheckbox('left');">Left</button></td>
+      <td align="center"></td><td align="center"><button class="button" onmousedown="toggleCheckbox('right');" ontouchstart="toggleCheckbox('right');">Right</button></td></tr>
+      <tr><td colspan="3" align="center"><button class="button" onmousedown="toggleCheckbox('down');" ontouchstart="toggleCheckbox('down');">Don</button></td></tr>
+      <tr><td colspan="3" align="center"><button class="button" onmousedown="toggleCheckbox('vflip');">Flip Vertical</button></td></tr>
+      <tr><td colspan="3" align="center"><button class="button" onmousedown="toggleCheckbox('hmirror');">Flip Horizontal</button></td></tr>
     </table>
    <script>
      function toggleCheckbox(x) {
@@ -168,6 +170,7 @@ static esp_err_t cmd_handler(httpd_req_t *req){
   size_t buf_len;
   char variable[32] = {0,};
   
+
   buf_len = httpd_req_get_url_query_len(req) + 1;
   if (buf_len > 1) {
     buf = (char*)malloc(buf_len);
@@ -200,9 +203,11 @@ static esp_err_t cmd_handler(httpd_req_t *req){
             servo1.write(servo1Pos);
           }
         } else if (strcmp(variable, "vflip") == 0) {
-          s->set_vflip(s, 1);  // Aktiver vflip
+          s->set_vflip(s, vflip);  // Aktiver vflip
+          vflip=!vflip;
         } else if (strcmp(variable, "hmirror") == 0) {
-          s->set_hmirror(s, 1);  // Aktiver hmirror
+          s->set_hmirror(s, hflip);  // Aktiver hmirror
+          hflip=!hflip;
         }
 
         free(buf);
