@@ -179,7 +179,7 @@ static esp_err_t cmd_handler(httpd_req_t *req){
       if (httpd_query_key_value(buf, "go", variable, sizeof(variable)) == ESP_OK) {
         sensor_t * s = esp_camera_sensor_get();
         // Kontroller kommandoerne
-        if (strcmp(variable, "up") == 0) {
+        if (strcmp(variable, "down") == 0) {
           if(servo1Pos <= 170) {
             servo1Pos += 10;
             servo1.write(servo1Pos);
@@ -194,7 +194,7 @@ static esp_err_t cmd_handler(httpd_req_t *req){
             servo2Pos -= 10;
             servo2.write(servo2Pos);
           }
-        } else if (strcmp(variable, "down") == 0) {
+        } else if (strcmp(variable, "up") == 0) {
           if(servo1Pos >= 10) {
             servo1Pos -= 10;
             servo1.write(servo1Pos);
